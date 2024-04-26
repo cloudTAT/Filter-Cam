@@ -56,13 +56,47 @@ import android.renderscript.Allocation;
 import android.renderscript.Element;
 import android.renderscript.RenderScript;
 import android.renderscript.ScriptIntrinsicBlur;
-//import org.opencv.android.Utils
-//import org.opencv.core.CvType
-//import org.opencv.core.Mat
-//import org.opencv.imgproc.Imgproc
+import org.opencv.android.Utils
+import org.opencv.core.CvType
+import org.opencv.core.Mat
+import org.opencv.imgproc.Imgproc
+import org.opencv.android.OpenCVLoader
+import org.opencv.core.Core
+import org.opencv.core.Scalar
+import org.opencv.core.Size
+
 
 //IMAGE PROCESSING
 object ImageUtils {
+
+    fun enhanceImageQuality(inputBitmap: Bitmap, contrast: Float, brightness: Int, sharpenAmount: Float): Bitmap {
+        // Convert Bitmap to Mat (OpenCV format)
+        val inputMat = Mat()
+        Utils.bitmapToMat(inputBitmap, inputMat)
+
+        // Create a blank Mat for the output image
+        val outputMat = Mat(inputMat.size(), inputMat.type())
+
+        // Apply contrast and brightness adjustment
+        inputMat.convertTo(outputMat, -1, contrast.toDouble(), brightness.toDouble())
+
+        // Apply sharpening
+        val sharpenedMat = Mat()
+        Imgproc.GaussianBlur(outputMat, sharpenedMat, org.opencv.core.Size(0.0, 0.0), 10.0)
+        Core.addWeighted(outputMat, 1.5 + sharpenAmount, sharpenedMat, -0.5 * sharpenAmount, 0.0, sharpenedMat)
+
+        // Convert Mat back to Bitmap
+        val outputBitmap = Bitmap.createBitmap(sharpenedMat.cols(), sharpenedMat.rows(), Bitmap.Config.ARGB_8888)
+        Utils.matToBitmap(sharpenedMat, outputBitmap)
+
+        // Release Mats
+        inputMat.release()
+        outputMat.release()
+        sharpenedMat.release()
+
+        return outputBitmap
+    }
+}
     fun applyGaussianBlur(context: Context, source: Bitmap, radius: Float): Bitmap {
         // Create a new bitmap for the blurred image
         val blurredBitmap = Bitmap.createBitmap(source.width, source.height, Bitmap.Config.ARGB_8888)
@@ -95,34 +129,104 @@ object ImageUtils {
         return blurredBitmap
     }
 
-//    fun applyLaplacianSharpening(original: Bitmap, kernelSize: Int, scale: Double, delta: Double): Bitmap {
-//        // Convert Bitmap to Mat (OpenCV format)
-//        val mat = Mat(original.width, original.height, CvType.CV_8UC1)
-//        Utils.bitmapToMat(original, mat)
-//
-//        // Convert the image to grayscale
-//        Imgproc.cvtColor(mat, mat, Imgproc.COLOR_BGR2GRAY)
-//
-//        // Apply Laplacian sharpening
-//        val sharpened = Mat()
-//        Imgproc.Laplacian(mat, sharpened, CvType.CV_8UC1, kernelSize, scale, delta)
-//
-//        // Convert Mat back to Bitmap
-//        val sharpenedBitmap = Bitmap.createBitmap(sharpened.cols(), sharpened.rows(), Bitmap.Config.ARGB_8888)
-//        Utils.matToBitmap(sharpened, sharpenedBitmap)
-//
-//        // Release Mats
-//        mat.release()
-//        sharpened.release()
-//
-//        return sharpenedBitmap
-//    }
+    fun extractOutlines(capturedBitmap: Bitmap): Bitmap {
+        // Convert Bitmap to Mat (OpenCV format)
+        val mat = Mat()
+        Utils.bitmapToMat(capturedBitmap, mat)
 
+        // Convert the image to grayscale
+        Imgproc.cvtColor(mat, mat, Imgproc.COLOR_BGR2GRAY)
+
+        // Apply Gaussian blur to reduce noise
+        val blurred = Mat()
+        Imgproc.GaussianBlur(mat, blurred, Size(5.0, 5.0), 0.0)
+
+        // Perform Canny edge detection
+        val edges = Mat()
+        Imgproc.Canny(blurred, edges, 50.0, 150.0)
+
+        // Convert edges Mat back to Bitmap
+        val edgesBitmap = Bitmap.createBitmap(edges.cols(), edges.rows(), Bitmap.Config.ARGB_8888)
+        Utils.matToBitmap(edges, edgesBitmap)
+
+        // Release Mats
+        mat.release()
+        blurred.release()
+        edges.release()
+
+        return edgesBitmap
+    }
+
+    fun applyLaplacianSharpening(original: Bitmap, kernelSize: Int, scale: Double, delta: Double): Bitmap {
+        // Convert Bitmap to Mat (OpenCV format)
+        val mat = Mat(original.width, original.height, CvType.CV_8UC1)
+        Utils.bitmapToMat(original, mat)
+
+        // Convert the image to grayscale
+        Imgproc.cvtColor(mat, mat, Imgproc.COLOR_BGR2GRAY)
+
+        // Apply Laplacian sharpening
+        val sharpened = Mat()
+        Imgproc.Laplacian(mat, sharpened, CvType.CV_8UC1, kernelSize, scale, delta)
+
+        // Convert Mat back to Bitmap
+        val sharpenedBitmap = Bitmap.createBitmap(sharpened.cols(), sharpened.rows(), Bitmap.Config.ARGB_8888)
+        Utils.matToBitmap(sharpened, sharpenedBitmap)
+
+        // Release Mats
+        mat.release()
+        sharpened.release()
+
+        return sharpenedBitmap
+    }
+fun applyUnsharpMasking(original: Bitmap, amount: Float): Bitmap {
+    // Create a new bitmap for the sharpened image
+    val sharpenedBitmap = Bitmap.createBitmap(original.width, original.height, Bitmap.Config.ARGB_8888)
+
+    // Loop through each pixel to calculate the unsharp masking
+    for (x in 0 until original.width) {
+        for (y in 0 until original.height) {
+            val pixelOriginal = original.getPixel(x, y)
+
+            // Extract ARGB components
+            val alpha = pixelOriginal shr 24 and 0xFF
+            val redOriginal = pixelOriginal shr 16 and 0xFF
+            val greenOriginal = pixelOriginal shr 8 and 0xFF
+            val blueOriginal = pixelOriginal and 0xFF
+
+            // Calculate the average of RGB values
+            val avgOriginal = (redOriginal + greenOriginal + blueOriginal) / 3
+
+            // Calculate the difference
+            val diff = avgOriginal - redOriginal
+
+            // Apply unsharp masking
+            val newRed = (redOriginal + amount * diff).toInt().coerceIn(0, 255)
+            val newGreen = (greenOriginal + amount * diff).toInt().coerceIn(0, 255)
+            val newBlue = (blueOriginal + amount * diff).toInt().coerceIn(0, 255)
+
+            // Compose the new pixel value
+            val newPixel = alpha shl 24 or (newRed shl 16) or (newGreen shl 8) or newBlue
+            sharpenedBitmap.setPixel(x, y, newPixel)
+        }
+    }
+
+    return sharpenedBitmap
 }
+
+
+
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Initialize OpenCV
+        if (!OpenCVLoader.initDebug()) {
+            // Handle initialization error if needed
+        }
+
         if (!hasRequiredPermissions()) {
             ActivityCompat.requestPermissions(
                 this, CAMERAX_PERMISSIONS, 0
@@ -245,6 +349,7 @@ class MainActivity : ComponentActivity() {
 
                     //IMAGE PROCESSING
                     //val blurRadius = 3f // Adjust the blur radius as needed
+                    //val unsharpAmount = 3f // Adjust the amount of sharpening as needed
                     val kernelSize = 3 // Adjust the kernel size as needed (e.g., 3x3, 5x5)
                     val scale = 1.0 // Adjust the scale factor as needed
                     val delta = 0.0 // Adjust the delta value as needed
@@ -254,9 +359,17 @@ class MainActivity : ComponentActivity() {
 
                     // Apply Laplacian sharpening
                     // val sharpenedBitmap = ImageUtils.applyLaplacianSharpening(rotatedBitmap, kernelSize, scale, delta)
+                    //val sharpenedBitmap = ImageUtils.applyUnsharpMasking(rotatedBitmap, unsharpAmount)
 
-                    // Display the blurred image
-                    onPhotoTaken(rotatedBitmap)
+                    // Apply Laplacian sharpening
+                    // val sharpenedBitmap = ImageUtils.applyLaplacianSharpening(rotatedBitmap, kernelSize, scale, delta)
+
+                    //val edgesBitmap = ImageUtils.extractOutlines(rotatedBitmap)
+
+                    val enhancedBitmap = ImageUtils.enhanceImageQuality(rotatedBitmap, 1.5f, 10, 0.5f)
+
+                    // Display image
+                    onPhotoTaken(enhancedBitmap)
                 }
 
                 override fun onError(exception: ImageCaptureException) {

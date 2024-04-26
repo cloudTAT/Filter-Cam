@@ -15,4 +15,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "CameraXGuide"
 include(":app")
+include(":opencv")
  
