@@ -56,6 +56,7 @@ import android.renderscript.Allocation;
 import android.renderscript.Element;
 import android.renderscript.RenderScript;
 import android.renderscript.ScriptIntrinsicBlur;
+import androidx.compose.material.icons.filled.PhotoFilter
 import org.opencv.android.Utils
 import org.opencv.core.CvType
 import org.opencv.core.Mat
@@ -68,7 +69,6 @@ import org.opencv.core.Size
 
 //IMAGE PROCESSING
 object ImageUtils {
-
     fun calculateImageDifference(defaultBitmap: Bitmap, otherBitmap: Bitmap): Bitmap {
         // Convert Bitmaps to Mats (OpenCV format)
         val defaultMat = Mat()
@@ -285,10 +285,20 @@ object ImageUtils {
     }
 }
 
-
-
+enum class FilterType {
+    NONE, // Default filter
+    DIFFERENCE,
+    RES,
+    ENHANCE,
+    BLUR,
+    OUTLINES,
+    LAPLACIAN,
+    UNSHARP
+}
 
 class MainActivity : ComponentActivity() {
+    private var currentFilter: FilterType = FilterType.NONE
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -376,6 +386,25 @@ class MainActivity : ComponentActivity() {
                             }
                             IconButton(
                                 onClick = {
+                                    currentFilter = when (currentFilter) {
+                                        FilterType.NONE -> FilterType.DIFFERENCE
+                                        FilterType.DIFFERENCE -> FilterType.RES
+                                        FilterType.RES -> FilterType.ENHANCE
+                                        FilterType.ENHANCE -> FilterType.BLUR
+                                        FilterType.BLUR -> FilterType.OUTLINES
+                                        FilterType.OUTLINES -> FilterType.LAPLACIAN
+                                        FilterType.LAPLACIAN -> FilterType.UNSHARP
+                                        FilterType.UNSHARP -> FilterType.NONE
+                                    }
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PhotoFilter,
+                                    contentDescription = "Changes filter"
+                                )
+                            }
+                            IconButton(
+                                onClick = {
                                     takePhoto(
                                         controller = controller,
                                         onPhotoTaken = viewModel::onTakePhoto
@@ -418,34 +447,22 @@ class MainActivity : ComponentActivity() {
                     )
 
                     //IMAGE PROCESSING
-                    //val blurRadius = 3f // Adjust the blur radius as needed
-                    //val unsharpAmount = 3f // Adjust the amount of sharpening as needed
-                    val kernelSize = 3 // Adjust the kernel size as needed (e.g., 3x3, 5x5)
-                    val scale = 1.0 // Adjust the scale factor as needed
-                    val delta = 0.0 // Adjust the delta value as needed
-
-                    // Apply Gaussian blur
-                    //val blurredBitmap = ImageUtils.applyGaussianBlur(applicationContext, rotatedBitmap, blurRadius)
-
-                    // Apply Laplacian sharpening
-                    // val sharpenedBitmap = ImageUtils.applyLaplacianSharpening(rotatedBitmap, kernelSize, scale, delta)
-                    //val sharpenedBitmap = ImageUtils.applyUnsharpMasking(rotatedBitmap, unsharpAmount)
-
-                    // Apply Laplacian sharpening
-                    // val sharpenedBitmap = ImageUtils.applyLaplacianSharpening(rotatedBitmap, kernelSize, scale, delta)
-
-                    //val edgesBitmap = ImageUtils.extractOutlines(rotatedBitmap)
-
-                    val enhancedBitmap = ImageUtils.enhanceImageQuality(rotatedBitmap, 1.5f, 10, 0.5f)
-
-                    val increasedResBitmap = ImageUtils.increaseResolution(enhancedBitmap, 4.0) // Increase resolution by a factor of 2
-
-                    val outlinesBitmap = ImageUtils.extractOutlines(increasedResBitmap) // Extract outlines from the otherBitmap
-
-                    val differenceBitmap = ImageUtils.calculateImageDifference(increasedResBitmap, outlinesBitmap)
+                    val filteredBitmap = when (currentFilter) {
+                        FilterType.NONE -> rotatedBitmap
+                        FilterType.DIFFERENCE -> {
+                            val outlinesBitmap = ImageUtils.extractOutlines(rotatedBitmap)
+                            ImageUtils.calculateImageDifference(rotatedBitmap, outlinesBitmap)
+                        }
+                        FilterType.RES -> ImageUtils.increaseResolution(rotatedBitmap, 4.0)
+                        FilterType.ENHANCE -> ImageUtils.enhanceImageQuality(rotatedBitmap, 1.5f, 10, 0.5f)
+                        FilterType.BLUR -> ImageUtils.applyGaussianBlur(applicationContext, rotatedBitmap, 3f)
+                        FilterType.OUTLINES -> ImageUtils.extractOutlines(rotatedBitmap)
+                        FilterType.LAPLACIAN -> ImageUtils.applyLaplacianSharpening(rotatedBitmap, 3, 1.0, 0.0)
+                        FilterType.UNSHARP -> ImageUtils.applyUnsharpMasking(rotatedBitmap, 3f)
+                    }
 
                     // Display image
-                    onPhotoTaken(differenceBitmap)
+                    onPhotoTaken(filteredBitmap)
                 }
 
                 override fun onError(exception: ImageCaptureException) {
