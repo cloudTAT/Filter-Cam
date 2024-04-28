@@ -65,6 +65,8 @@ import org.opencv.android.OpenCVLoader
 import org.opencv.core.Core
 import org.opencv.core.Scalar
 import org.opencv.core.Size
+import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
 
 
 //IMAGE PROCESSING
@@ -296,8 +298,40 @@ enum class FilterType {
     UNSHARP
 }
 
+enum class FilterName {
+    NONE, // Default filter
+    DIFFERENCE,
+    RES,
+    ENHANCE,
+    BLUR,
+    OUTLINES,
+    LAPLACIAN,
+    UNSHARP
+}
+
 class MainActivity : ComponentActivity() {
     private var currentFilter: FilterType = FilterType.NONE
+    private var currentFilterName: FilterName by mutableStateOf(FilterName.NONE)
+
+    @Composable
+    private fun FilterIconButton(
+        onClick: () -> Unit
+    ) {
+        val scope = rememberCoroutineScope()
+
+        IconButton(
+            onClick = {
+                scope.launch {
+                    onClick()
+                }
+            }
+        ) {
+            Icon(
+                imageVector = Icons.Default.PhotoFilter,
+                contentDescription = "Changes filter"
+            )
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -384,7 +418,7 @@ class MainActivity : ComponentActivity() {
                                     contentDescription = "Open gallery"
                                 )
                             }
-                            IconButton(
+                            FilterIconButton(
                                 onClick = {
                                     currentFilter = when (currentFilter) {
                                         FilterType.NONE -> FilterType.DIFFERENCE
@@ -396,13 +430,21 @@ class MainActivity : ComponentActivity() {
                                         FilterType.LAPLACIAN -> FilterType.UNSHARP
                                         FilterType.UNSHARP -> FilterType.NONE
                                     }
+                                    currentFilterName = when (currentFilterName) {
+                                        FilterName.NONE -> FilterName.DIFFERENCE
+                                        FilterName.DIFFERENCE -> FilterName.RES
+                                        FilterName.RES -> FilterName.ENHANCE
+                                        FilterName.ENHANCE -> FilterName.BLUR
+                                        FilterName.BLUR -> FilterName.OUTLINES
+                                        FilterName.OUTLINES -> FilterName.LAPLACIAN
+                                        FilterName.LAPLACIAN -> FilterName.UNSHARP
+                                        FilterName.UNSHARP -> FilterName.NONE
+                                    }
                                 }
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.PhotoFilter,
-                                    contentDescription = "Changes filter"
-                                )
-                            }
+                            )
+
+                            Text(text = currentFilterName.name)
+
                             IconButton(
                                 onClick = {
                                     takePhoto(
