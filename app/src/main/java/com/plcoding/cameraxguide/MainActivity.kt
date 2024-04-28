@@ -495,7 +495,7 @@ class MainActivity : ComponentActivity() {
                             val outlinesBitmap = ImageUtils.extractOutlines(rotatedBitmap)
                             ImageUtils.calculateImageDifference(rotatedBitmap, outlinesBitmap)
                         }
-                        FilterType.RES -> ImageUtils.increaseResolution(rotatedBitmap, 4.0)
+                        FilterType.RES -> ImageUtils.increaseResolution(rotatedBitmap, 5.0)
                         FilterType.ENHANCE -> ImageUtils.enhanceImageQuality(rotatedBitmap, 1.5f, 10, 0.5f)
                         FilterType.BLUR -> ImageUtils.applyGaussianBlur(applicationContext, rotatedBitmap, 3f)
                         FilterType.OUTLINES -> ImageUtils.extractOutlines(rotatedBitmap)
